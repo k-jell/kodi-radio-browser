@@ -1,0 +1,16 @@
+from enum import Enum
+
+
+class LanguageCode(Enum):
+    TOP_CLICKED = 32000
+    TOP_VOTED = 32001
+    LAST_CHANGED = 32002
+    LAST_CLICKED = 32003
+    TAGS = 32004
+    COUNTRIES = 32005
+    ALL = 32006
+    SEARCH = 32007
+    MY_STATIONS = 32008
+    REMOVE_STATION = 32009
+    ADD_STATION = 32010
+    SEARCH_STATION = 32011

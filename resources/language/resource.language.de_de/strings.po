@@ -34,7 +34,7 @@ msgstr "100 letzt-geklickte Stationen"
 
 msgctxt "#32004"
 msgid "Tags"
-msgstr "Kategorien"
+msgstr "Kategorien (Genres)"
 
 msgctxt "#32005"
 msgid "Countries"

@@ -34,7 +34,7 @@ msgstr ""
 
 msgctxt "#32004"
 msgid "Tags"
-msgstr ""
+msgstr "Tags (Genres)"
 
 msgctxt "#32005"
 msgid "Countries"

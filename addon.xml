@@ -1,13 +1,17 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<addon id="plugin.audio.radiobrowser" name="Radio-Browser.info" version="1.2.0" provider-name="sailor">
+<addon id="plugin.audio.radiobrowser" name="Radio-Browser.info" version="2.0.0beta" provider-name="sailor">
   <requires>
-    <import addon="xbmc.python" version="2.24.0"/>
+    <import addon="xbmc.python" version="3.0.0"/>
   </requires>
-  <extension point="xbmc.python.pluginsource" library="main.py">
+  <extension point="xbmc.python.pluginsource" library="addon.py">
     <provides>audio</provides>
   </extension>
   <extension point="xbmc.addon.metadata">
     <platform>all</platform>
+    <assets>
+        <icon>icon.png</icon>
+        <fanart>fanart.jpg</fanart>
+    </assets>
     <summary lang="en">Radio-Browser</summary>
     <summary lang="bg">Radio-Browser</summary>
     <summary lang="de">Radio-Browser</summary>
