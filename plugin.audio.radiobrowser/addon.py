@@ -82,7 +82,7 @@ def addLink(stationuuid: str, name: str, url: str, favicon: str, bitrate: str):
     li = xbmcgui.ListItem(name)
     li.setArt({"icon": favicon})
     li.setProperty("IsPlayable", "true")
-    li.setInfo(type="Video", infoLabels={"Title": name, "Size": bitrate})
+    li.setInfo(type="Video", infoLabels={"Album": name, "Size": bitrate})
     localUrl = build_url({"mode": "play", "stationuuid": stationuuid})
 
     if stationuuid in MY_STATIONS.stations:
