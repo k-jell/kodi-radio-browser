@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import base64
 import json
 import random
@@ -6,7 +8,9 @@ import sys
 import urllib.error
 import urllib.parse
 import urllib.request
-from typing import Any, Dict, List
+from pathlib import Path
+from typing import Any
+from urllib.parse import urlencode
 
 import xbmc
 import xbmcaddon
@@ -15,12 +19,12 @@ import xbmcplugin
 import xbmcvfs
 from resources.lib.languagecodes import LanguageCode
 
-addonID: str = "plugin.audio.radiobrowser"
-addon: xbmcaddon.Addon = xbmcaddon.Addon(id=addonID)
+addon_id: str = "plugin.audio.radiobrowser"
+addon: xbmcaddon.Addon = xbmcaddon.Addon(id=addon_id)
 
 base_url: str = sys.argv[0]
 addon_handle = int(sys.argv[1])
-args: Dict[str, Any] = urllib.parse.parse_qs(sys.argv[2][1:])
+args = urllib.parse.parse_qs(sys.argv[2][1:])
 
 xbmcplugin.setContent(addon_handle, "songs")
 
@@ -29,26 +33,25 @@ mystations_path: str = profile + "/mystations.json"
 
 PAGE_LIMIT: int = 500
 
-DEFAULT_ICON: Dict[str, str] = {"icon": "DefaultFolder.png"}
+DEFAULT_ICON = {"icon": "DefaultFolder.png"}
 
 
 class MyStations:
-    def __init__(self, my_stations: Dict[str, Any]):
+    def __init__(self, my_stations: dict[str, Any]):
         self.stations = my_stations
 
 
 MY_STATIONS: MyStations = MyStations({})
 
 
-def get_radiobrowser_base_urls() -> List[str]:
-    """
-    Get all base urls of all currently available radiobrowser servers
+def get_radiobrowser_base_urls() -> list[str]:
+    """Get all base urls of all currently available radiobrowser servers.
 
     Returns:
     list: a list of strings
 
     """
-    hosts: List[str] = []
+    hosts: list[str] = []
     # get all hosts from DNS
     ips = socket.getaddrinfo("all.api.radio-browser.info", 80, 0, 0, socket.IPPROTO_TCP)
     for ip_tuple in ips:
@@ -65,32 +68,34 @@ def get_radiobrowser_base_urls() -> List[str]:
     random.shuffle(hosts)
     # add "https://" in front to make it an url
     xbmc.log("Found hosts: " + ",".join(hosts))
-    return list(["https://" + x for x in hosts])
+    return ["https://" + x for x in hosts]
 
 
-def LANGUAGE(id: int) -> str:
-    # return id
-    # return "undefined"
-    return addon.getLocalizedString(id)
+def language(language_id: int) -> str:
+    return addon.getLocalizedString(language_id)
 
 
-def build_url(query: Dict[str, "int | str | bytes"]):
+def build_url(query: dict[str, int | str | bytes]) -> str:
     return base_url + "?" + urllib.parse.urlencode(query)
 
 
-def addLink(stationuuid: str, name: str, url: str, favicon: str, bitrate: str):
+def add_link(stationuuid: str, name: str, url: str, favicon: str, bitrate: str) -> None:
     li = xbmcgui.ListItem(name)
-    li.setArt({"icon": favicon})
+    li.setArt({"icon": favicon, "thumb": favicon, "fanart": favicon})
+
     li.setProperty("IsPlayable", "true")
-    li.setInfo(type="Video", infoLabels={"Album": name, "Size": bitrate})
-    localUrl = build_url({"mode": "play", "stationuuid": stationuuid})
+    li.setProperty("playlist_type_hint", str(xbmc.PLAYLIST_MUSIC))
+    li.setProperty("StationName", name)
+    li.setInfo(type="Video", infoLabels={"Size": bitrate, "Album": name})
+    local_url = build_url({"mode": "play", "stationuuid": stationuuid})
+    li.setProperty("mimetype", "audio")
 
     if stationuuid in MY_STATIONS.stations:
-        contextTitle = LANGUAGE(LanguageCode.REMOVE_STATION.value)
-        contextUrl = build_url({"mode": "delstation", "stationuuid": stationuuid})
+        context_title = language(LanguageCode.REMOVE_STATION.value)
+        context_url = build_url({"mode": "delstation", "stationuuid": stationuuid})
     else:
-        contextTitle = LANGUAGE(LanguageCode.ADD_STATION.value)
-        contextUrl = build_url(
+        context_title = language(LanguageCode.ADD_STATION.value)
+        context_url = build_url(
             {
                 "mode": "addstation",
                 "stationuuid": stationuuid,
@@ -98,19 +103,19 @@ def addLink(stationuuid: str, name: str, url: str, favicon: str, bitrate: str):
                 "url": url,
                 "favicon": favicon,
                 "bitrate": bitrate,
-            }
+            },
         )
 
-    li.addContextMenuItems([(contextTitle, "RunPlugin(%s)" % (contextUrl))])
+    xbmc.log(local_url)
+    li.addContextMenuItems([(context_title, f"RunPlugin({context_url})")])
 
-    xbmcplugin.addDirectoryItem(
-        handle=addon_handle, url=localUrl, listitem=li, isFolder=False
-    )
+    xbmcplugin.addDirectoryItem(handle=addon_handle, url=local_url, listitem=li, isFolder=False)
 
 
-def downloadFile(uri: str, param, url_parameter: Dict[str, Any] = {}) -> bytes:
-    """
-    Download file with the correct headers set
+def download_file(
+    uri: str, param: dict[str, Any] | None, url_parameter: dict[str, Any] | None = None
+) -> bytes:
+    """Download file with the correct headers set.
 
     Returns:
     a string result
@@ -119,14 +124,18 @@ def downloadFile(uri: str, param, url_parameter: Dict[str, Any] = {}) -> bytes:
     if url_parameter:
         url_parameter_encoded = urllib.parse.urlencode(url_parameter)
         uri = uri + "?" + url_parameter_encoded
-    paramEncoded = None
+    param_encoded = None
     if param is not None:
-        paramEncoded = json.dumps(param).encode("utf-8")
+        param_encoded = json.dumps(param).encode("utf-8")
         xbmc.log("Request to " + uri + " Params: " + ",".join(param))
     else:
         xbmc.log("Request to " + uri)
 
-    req = urllib.request.Request(uri, paramEncoded)
+    if not uri.startswith("http"):
+        xbmc.log("URI needs to be http(s).", xbmc.LOGERROR)
+        msg = "Invalid url"
+        raise ValueError(msg)
+    req = urllib.request.Request(uri, param_encoded)
     req.add_header("User-Agent", "KodiRadioBrowser/2.0.0beta")
     req.add_header("Content-Type", "application/json")
     response = urllib.request.urlopen(req)
@@ -136,13 +145,13 @@ def downloadFile(uri: str, param, url_parameter: Dict[str, Any] = {}) -> bytes:
     return data
 
 
-def downloadApiFile(
+def download_api_file(
     path: str,
-    param: "Dict[str, Any] | None",
-    url_parameter: Dict[str, "str | int"] = {},
+    param: dict[str, Any] | None,
+    url_parameter: dict[str, str | int] | None = None,
 ) -> bytes:
-    """
-    Download file with relative url from a random api server.
+    """Download file with relative url from a random api server.
+
     Retry with other api servers if failed.
 
     Returns:
@@ -150,26 +159,22 @@ def downloadApiFile(
 
     """
     servers = get_radiobrowser_base_urls()
-    i = 0
-    for server_base in servers:
+    for i, server_base in enumerate(servers):
         xbmc.log("Random server: " + server_base + " Try: " + str(i))
         uri = server_base + path
 
         try:
-            data = downloadFile(uri, param, url_parameter=url_parameter)
-            return data
-        except Exception as e:
+            return download_file(uri, param, url_parameter=url_parameter)
+        except (ValueError, urllib.error.URLError) as e:
             xbmc.log("Unable to download from api url: " + uri, xbmc.LOGERROR)
             xbmc.log(str(e))
-            pass
-        i += 1
     return b""
 
 
-def addPlayableLink(data: bytes):
-    dataDecoded = json.loads(data)
-    for station in dataDecoded:
-        addLink(
+def add_playable_link(data: bytes) -> None:
+    data_decoded = json.loads(data)
+    for station in data_decoded:
+        add_link(
             station["stationuuid"],
             station["name"],
             station["url"],
@@ -178,17 +183,17 @@ def addPlayableLink(data: bytes):
         )
 
 
-def readFile(filepath: str) -> Any:
-    with open(filepath, "r") as read_file:
+def read_file(filepath: str) -> Any:
+    with Path(filepath).open() as read_file:
         return json.load(read_file)
 
 
-def writeFile(filepath: str, data: Any):
-    with open(filepath, "w") as write_file:
+def write_file(filepath: str, data: Any) -> None:
+    with Path(filepath).open("w") as write_file:
         return json.dump(data, write_file)
 
 
-def addToMyStations(stationuuid: str, name: str, url: str, favicon: str, bitrate: str):
+def add_to_my_stations(stationuuid: str, name: str, url: str, favicon: str, bitrate: str) -> None:
     MY_STATIONS.stations[stationuuid] = {
         "stationuuid": stationuuid,
         "name": name,
@@ -196,72 +201,72 @@ def addToMyStations(stationuuid: str, name: str, url: str, favicon: str, bitrate
         "bitrate": bitrate,
         "favicon": favicon,
     }
-    writeFile(mystations_path, MY_STATIONS.stations)
+    write_file(mystations_path, MY_STATIONS.stations)
 
 
-def delFromMyStations(stationuuid: str):
+def del_from_my_stations(stationuuid: str) -> None:
     if stationuuid in MY_STATIONS.stations:
         del MY_STATIONS.stations[stationuuid]
-        writeFile(mystations_path, MY_STATIONS.stations)
+        write_file(mystations_path, MY_STATIONS.stations)
         xbmc.executebuiltin("Container.Refresh")
 
 
-def createDirectoryItem(
-    urlArgs: Dict[str, "str | bytes | int"], name: str, artArgs: Dict[str, str]
-):
-    localUrl = build_url(urlArgs)
+def create_directory_item(
+    url_args: dict[str, str | bytes | int],
+    name: str,
+    art_args: dict[str, str],
+) -> None:
+    local_url = build_url(url_args)
     li = xbmcgui.ListItem(name)
-    li.setArt(artArgs)
-    xbmcplugin.addDirectoryItem(
-        handle=addon_handle, url=localUrl, listitem=li, isFolder=True
-    )
+    li.setArt(art_args)
+    xbmcplugin.addDirectoryItem(handle=addon_handle, url=local_url, listitem=li, isFolder=True)
 
 
-def buildMenu() -> None:
-    createDirectoryItem(
+def build_menu() -> None:
+    create_directory_item(
         {"mode": "stations", "url": "/json/stations/topclick/100"},
-        LANGUAGE(LanguageCode.TOP_CLICKED.value),
+        language(LanguageCode.TOP_CLICKED.value),
         DEFAULT_ICON,
     )
-    createDirectoryItem(
+    create_directory_item(
         {"mode": "stations", "url": "/json/stations/topvote/100"},
-        LANGUAGE(LanguageCode.TOP_VOTED.value),
+        language(LanguageCode.TOP_VOTED.value),
         DEFAULT_ICON,
     )
-    createDirectoryItem(
+    create_directory_item(
         {"mode": "stations", "url": "/json/stations/lastchange/100"},
-        LANGUAGE(LanguageCode.LAST_CHANGED.value),
+        language(LanguageCode.LAST_CHANGED.value),
         DEFAULT_ICON,
     )
-    createDirectoryItem(
+    create_directory_item(
         {"mode": "stations", "url": "/json/stations/lastclick/100"},
-        LANGUAGE(LanguageCode.LAST_CLICKED.value),
+        language(LanguageCode.LAST_CLICKED.value),
         DEFAULT_ICON,
     )
-    createDirectoryItem(
+    create_directory_item(
         {"mode": "tags"},
-        LANGUAGE(LanguageCode.TAGS.value),
+        language(LanguageCode.TAGS.value),
         DEFAULT_ICON,
     )
-    createDirectoryItem(
+    create_directory_item(
         {"mode": "countries"},
-        LANGUAGE(LanguageCode.COUNTRIES.value),
+        language(LanguageCode.COUNTRIES.value),
         DEFAULT_ICON,
     )
-    createDirectoryItem(
+    create_directory_item(
         {"mode": "search"},
-        LANGUAGE(LanguageCode.SEARCH.value),
+        language(LanguageCode.SEARCH.value),
         DEFAULT_ICON,
     )
-    createDirectoryItem(
+    create_directory_item(
         {"mode": "mystations"},
-        LANGUAGE(LanguageCode.MY_STATIONS.value),
+        language(LanguageCode.MY_STATIONS.value),
         DEFAULT_ICON,
     )
     xbmcplugin.endOfDirectory(addon_handle)
 
 
-def buildTagsList(args: Dict[str, Any]) -> None:
+def build_tags_list(args: dict[str, Any]) -> None:
     page = args.get("page")
     if page is not None:
         try:
@@ -271,37 +276,36 @@ def buildTagsList(args: Dict[str, Any]) -> None:
     else:
         page = 0
 
-    url_parameter: Dict[str, "str | int"] = {
+    url_parameter: dict[str, str | int] = {
         "limit": PAGE_LIMIT,
         "offset": page * PAGE_LIMIT,
     }
 
-    data = downloadApiFile("/json/tags", None, url_parameter=url_parameter)
-    dataDecoded = json.loads(data)
-    tagName = ""
+    data = download_api_file("/json/tags", None, url_parameter=url_parameter)
+    data_decoded = json.loads(data)
+    tag_name = ""
 
-    for tag in dataDecoded:
-        tagName = tag.get("name", "")
+    for tag in data_decoded:
+        tag_name = tag.get("name", "")
         if int(tag["stationcount"]) > 1:
             try:
-                createDirectoryItem(
+                create_directory_item(
                     {
                         "mode": "stations",
                         "key": "tag",
-                        "value": base64.b32encode(tagName.encode("utf-8")),
+                        "value": base64.b32encode(tag_name.encode("utf-8")),
                     },
-                    tagName,
+                    tag_name,
                     DEFAULT_ICON,
                 )
             except Exception as e:
                 xbmcgui.Dialog().notification("Error", repr(e))
-                pass
 
-    createDirectoryItem(
+    create_directory_item(
         {
             "mode": "tags",
             "page": page + 1,
-            "value": base64.b32encode(tagName.encode("utf-8")),
+            "value": base64.b32encode(tag_name.encode("utf-8")),
         },
         "Next ->",
         DEFAULT_ICON,
@@ -309,127 +313,139 @@ def buildTagsList(args: Dict[str, Any]) -> None:
     xbmcplugin.endOfDirectory(addon_handle)
 
 
-def buildCountriesList() -> None:
-    data = downloadApiFile("/json/countries", None)
-    dataDecoded = json.loads(data)
-    for tag in dataDecoded:
-        countryName = tag["name"]
-        if not countryName:
+def build_countries_list() -> None:
+    data = download_api_file("/json/countries", None)
+    data_decoded = json.loads(data)
+    for tag in data_decoded:
+        country_name = tag["name"]
+        if not country_name:
             continue
         if int(tag["stationcount"]) > 1:
             try:
-                createDirectoryItem(
+                create_directory_item(
                     {
                         "mode": "states",
-                        "country": base64.b32encode(countryName.encode("utf-8")),
+                        "country": base64.b32encode(country_name.encode("utf-8")),
                     },
-                    countryName,
+                    country_name,
                     DEFAULT_ICON,
                 )
             except Exception as e:
-                xbmc.log("Stationcount is not of type int", xbmc.LOGERROR)
+                xbmc.log("Station count is not of type int", xbmc.LOGERROR)
                 xbmc.log(str(e))
-                pass
 
     xbmcplugin.endOfDirectory(addon_handle)
 
 
-def buildStatesList(args: Dict[str, Any]) -> None:
+def build_states_list(args: dict[str, Any]) -> None:
     country = args["country"][0]
     country = base64.b32decode(country)
     country = country.decode("utf-8")
 
-    data = downloadApiFile("/json/states/" + urllib.parse.quote(country) + "/", None)
-    dataDecoded = json.loads(data)
+    data = download_api_file("/json/states/" + urllib.parse.quote(country) + "/", None)
+    data_decoded = json.loads(data)
 
-    createDirectoryItem(
+    create_directory_item(
         {
             "mode": "stations",
             "key": "country",
             "value": base64.b32encode(country.encode("utf-8")),
         },
-        LANGUAGE(LanguageCode.ALL.value),
+        language(LanguageCode.ALL.value),
         DEFAULT_ICON,
     )
 
-    for tag in dataDecoded:
-        stateName = tag["name"]
+    for tag in data_decoded:
+        state_name = tag["name"]
         if int(tag["stationcount"]) > 1:
             try:
-                createDirectoryItem(
+                create_directory_item(
                     {
                         "mode": "stations",
                         "key": "state",
-                        "value": base64.b32encode(stateName.encode("utf-8")),
+                        "value": base64.b32encode(state_name.encode("utf-8")),
                     },
-                    stateName,
+                    state_name,
                     DEFAULT_ICON,
                 )
             except Exception as e:
                 xbmc.log("Stationcount is not of type int", xbmc.LOGERROR)
                 xbmc.log(str(e))
-                pass
 
     xbmcplugin.endOfDirectory(addon_handle)
 
 
-def buildStationsSearch(args: Dict[str, Any]) -> None:
+def build_stations_search(args: dict[str, Any]) -> None:
     url = "/json/stations/search"
-    param: Dict[str, Any] = {}
+    param: dict[str, Any] = {}
     if "url" in args:
         url = args["url"][0]
     else:
         key = args["key"][0]
         value = base64.b32decode(args["value"][0])
         value = value.decode("utf-8")
-        param = dict({key: value})
+        param = {key: value}
         param["order"] = "clickcount"
         param["reverse"] = True
 
-    data = downloadApiFile(url, param)
-    addPlayableLink(data)
+    data = download_api_file(url, param)
+    add_playable_link(data)
     xbmcplugin.endOfDirectory(addon_handle)
 
 
-def playStation(args: Dict[str, Any]) -> None:
-    stationuuid = args["stationuuid"][0]
-    data = downloadApiFile("/json/url/" + str(stationuuid), None)
-    dataDecoded = json.loads(data)
-    uri = dataDecoded["url"]
-    xbmcplugin.setResolvedUrl(addon_handle, True, xbmcgui.ListItem(path=uri))
+def play_station(args: dict[str, Any]) -> None:
+    stationuuid = urlencode({"uuids": args["stationuuid"][0]})
+    data = download_api_file("/json/stations/byuuid?" + stationuuid, None)
+    data_decoded = json.loads(data)
+    data_decoded = data_decoded[0]
+    uri = data_decoded["url"]
+    li = xbmcgui.ListItem(path=uri)
+    li.setProperty("IsPlayable", "true")
+    li.setProperty("playlist_type_hint", str(xbmc.PLAYLIST_MUSIC))
+    li.setProperty("StationName", data_decoded["name"])
+    favicon = data_decoded.get("favicon", "")
+    li.setArt({"icon": favicon, "thumb": favicon, "fanart": favicon})
+    li.setInfo(
+        type="Video",
+        infoLabels={"size": data_decoded["bitrate"], "Album": data_decoded.get("name", "")},
+    )
+    xbmcplugin.setResolvedUrl(addon_handle, succeeded=True, listitem=li)
 
 
-def searchStations() -> None:
+def search_stations() -> None:
     dialog = xbmcgui.Dialog()
-    d = dialog.input(LANGUAGE(32011), type=xbmcgui.INPUT_ALPHANUM)
+    d = dialog.input(language(32011), type=xbmcgui.INPUT_ALPHANUM)
 
     url = "/json/stations/byname/" + d
-    data = downloadApiFile(url, None)
-    addPlayableLink(data)
+    data = download_api_file(url, None)
+    add_playable_link(data)
 
     xbmcplugin.endOfDirectory(addon_handle)
 
 
-def buildMyStations() -> None:
+def build_my_stations() -> None:
     for station in list(MY_STATIONS.stations.values()):
-        addLink(
+        add_link(
             station["stationuuid"],
             station["name"],
             station["url"],
             station["favicon"],
             station["bitrate"],
         )
-    addStationURL = build_url({"mode": "addcustom"})
+    add_station_url = build_url({"mode": "addcustom"})
     li = xbmcgui.ListItem("Add Station")
     xbmcplugin.addDirectoryItem(
-        handle=addon_handle, url=addStationURL, listitem=li, isFolder=False
+        handle=addon_handle,
+        url=add_station_url,
+        listitem=li,
+        isFolder=False,
     )
     xbmcplugin.endOfDirectory(addon_handle)
 
 
-def addStation(args: Dict[str, Any]) -> None:
+def add_station(args: dict[str, Any]) -> None:
     favicon = args["favicon"][0] if "favicon" in args else ""
-    addToMyStations(
+    add_to_my_stations(
         args["stationuuid"][0],
         args["name"][0],
         args["url"][0],
@@ -438,11 +454,11 @@ def addStation(args: Dict[str, Any]) -> None:
     )
 
 
-def deleteStation(args: Dict[str, Any]) -> None:
-    delFromMyStations(args["stationuuid"][0])
+def delete_station(args: dict[str, Any]) -> None:
+    del_from_my_stations(args["stationuuid"][0])
 
 
-def addCustomStation() -> None:
+def add_custom_station() -> None:
     kb = xbmc.Keyboard("default", "heading")
     kb.setDefault("title")  # optional
     kb.setHeading("Enter Title")  # optional
@@ -457,45 +473,45 @@ def addCustomStation() -> None:
     url = ""
     if kb.isConfirmed():
         url = kb.getText()
-    addToMyStations("dd98c499-a0c4-4019-a35e-99caa6940407", title, url, "", "192")
+    add_to_my_stations("dd98c499-a0c4-4019-a35e-99caa6940407", title, url, "", "192")
     refresh_url = build_url({"mode": "mystations"})
     xbmc.executebuiltin("Container.Refresh(" + refresh_url + ")")
 
 
-def router(mode: "str | None", args: Dict[str, Any]) -> None:
+def router(mode: str | None, args: dict[str, Any]) -> None:
     if mode is None:
-        buildMenu()
+        build_menu()
     elif mode == "tags":
-        buildTagsList(args)
+        build_tags_list(args)
     elif mode == "countries":
-        buildCountriesList()
+        build_countries_list()
     elif mode == "states":
-        buildStatesList(args)
+        build_states_list(args)
     elif mode == "stations":
-        buildStationsSearch(args)
+        build_stations_search(args)
     elif mode == "play":
-        playStation(args)
+        play_station(args)
     elif mode == "search":
-        searchStations()
+        search_stations()
     elif mode == "mystations":
-        buildMyStations()
+        build_my_stations()
     elif mode == "addstation":
-        addStation(args)
+        add_station(args)
     elif mode == "delstation":
-        deleteStation(args)
+        delete_station(args)
     elif mode == "addcustom":
-        addCustomStation()
+        add_custom_station()
 
 
-def main():
+def main() -> None:
     # create storage
     if not xbmcvfs.exists(profile):
         xbmcvfs.mkdir(profile)
 
     if xbmcvfs.exists(mystations_path):
-        MY_STATIONS.stations = readFile(mystations_path)
+        MY_STATIONS.stations = read_file(mystations_path)
     else:
-        writeFile(mystations_path, MY_STATIONS.stations)
+        write_file(mystations_path, MY_STATIONS.stations)
 
     mode = args.get("mode", None)
     if mode is not None:
