@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<addon id="plugin.audio.radiobrowser" name="Radio-Browser.info" version="2.0.0beta" provider-name="sailor">
+<addon id="plugin.audio.radiobrowser" name="Radio-Browser.info" version="2.1.0beta" provider-name="k-jell">
   <requires>
     <import addon="xbmc.python" version="3.0.0"/>
   </requires>
@@ -26,7 +26,7 @@ If you miss your favourite station, just go to www.radio-browser.info and add it
 Vermisst du deine Lieblingsstation? Kein problem: geh auf www.radio-browser.info und füge sie für alle Benutzer hinzu!</description>
     <license>GNU General Public License, Version 3</license>
     <website>https://www.radio-browser.info</website>
-    <source>https://github.com/segler-alex/kodi-radio-browser</source>
-    <email>segler_alex@web.de</email>
+    <source>https://github.com/k-jell/kodi-radio-browser</source>
+    <email>kjell.k@posteo.net</email>
   </extension>
 </addon>
