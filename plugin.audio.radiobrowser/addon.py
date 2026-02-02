@@ -416,7 +416,9 @@ def search_stations() -> None:
     dialog = xbmcgui.Dialog()
     d = dialog.input(language(32011), type=xbmcgui.INPUT_ALPHANUM)
 
-    url = "/json/stations/byname/" + d
+    escaped = urllib.parse.quote(d)
+
+    url = "/json/stations/byname/" + escaped
     data = download_api_file(url, None)
     add_playable_link(data)
 
